@@ -1,0 +1,5 @@
+# Nach Installation aööes Updaten
+sudo apt update && sudo apt full-upgrade -y
+sudo apt clean && sudo apt autoremove
+reboot
+sudo hostnamectl set-hostname %VAR1 #
