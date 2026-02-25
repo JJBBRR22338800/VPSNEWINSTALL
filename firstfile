@@ -2,4 +2,18 @@
 sudo apt update && sudo apt full-upgrade -y
 sudo apt clean && sudo apt autoremove
 reboot
-sudo hostnamectl set-hostname %VAR1 #
+sudo hostnamectl set-hostname %VAR1 #Variable setzen durch Script
+
+#NetBird Installieren:
+curl -fsSL https://pkgs.netbird.io/install.sh | sh
+netbird up
+
+#Docker installieren:
+sudo apt install apt-transport-https ca-certificates curl
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian trixie stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+#Docker testen
+sudo docker run hello-world
