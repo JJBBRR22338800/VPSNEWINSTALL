@@ -17,3 +17,148 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin dock
 
 #Docker testen
 sudo docker run hello-world
+
+#Midnight Commander installieren
+apt install mc
+
+# Benutzer mit Home-Verzeichnis und Passwort anlegen
+adduser jbadmin
+adduser joergboris
+adduser jbwork
+adduser work-vs
+
+# Admin-Rechte (Sudo) nur für jbadmin und joergboris
+# jbwork lassen wir absichtlich weg!
+usermod -aG sudo jbadmin
+usermod -aG sudo joergboris
+
+# Nur jbadmin und joergboris dürfen Docker steuern
+usermod -aG docker jbadmin
+usermod -aG docker joergboris
+usermod -aG docker jbwork
+
+Gemini hat gesagt
+Da du nun deine drei Benutzer (jbadmin, joergboris, jbwork) und die SSH-Sicherung im Kopf hast, setzen wir das jetzt direkt auf der Konsole um.
+
+Logge dich als root auf deinem vServer ein und folge diesem Fahrplan:
+
+1. Benutzer erstellen & Rechte vergeben
+Wir legen die User an und entscheiden, wer den "Admin-Hut" aufhaben darf.
+
+Bash
+# Benutzer mit Home-Verzeichnis und Passwort anlegen
+adduser jbadmin
+adduser joergboris
+adduser jbwork
+
+# Admin-Rechte (Sudo) nur für jbadmin und joergboris
+# jbwork lassen wir absichtlich weg!
+usermod -aG sudo jbadmin
+usermod -aG sudo joergboris
+2. Docker installieren & Zugriff einschränken
+Jetzt installieren wir Docker und legen fest, dass nur deine zwei Haupt-User damit arbeiten dürfen.
+
+Docker Installation (Schnellvariante):
+
+Bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+Docker-Berechtigung vergeben:
+In Linux steuert die Gruppe docker, wer den Dienst ohne sudo nutzen darf.
+
+Bash
+# Nur jbadmin und joergboris dürfen Docker steuern
+usermod -aG docker jbadmin
+usermod -aG docker joergboris
+Ergebnis: Wenn du dich später als jbwork einloggst und docker ps tippst, wird der Zugriff verweigert. Das ist genau das, was du wolltest.
+
+---------------------------------------------------------------------------------------
+            3. SSH-Absicherung (Das "Schild" für den Server)
+            Damit niemand dein Passwort erraten kann, erzwingen wir SSH-Keys.
+            
+            A) Auf deinem PC (Lokal):
+            Öffne dein Terminal (Windows PowerShell oder Mac/Linux) und erstelle einen Key:
+            
+            Bash
+            ssh-keygen -t ed25519 -C "vserver-key"
+            # Drücke Enter, um den Standardpfad zu bestätigen.
+            Übertrage den Key für jeden User (ersetze IP durch deine Server-IP):
+            
+            Bash
+            ssh-copy-id jbadmin@IP
+            ssh-copy-id joergboris@IP
+            ssh-copy-id jbwork@IP
+            ssh-copy-id root@IP
+            B) Auf dem Server (SSH-Konfiguration):
+            Jetzt machen wir die Tür für Passwort-Hacker zu.
+            
+            Bash
+            sudo nano /etc/ssh/sshd_config
+            Ändere/Ergänze folgende Zeilen:
+            
+            PasswordAuthentication no (Verbietet alle Passwörter via SSH)
+            
+            PubkeyAuthentication yes (Erlaubt Keys)
+            
+            PermitRootLogin prohibit-password (Root darf NUR mit Key rein, nie mit Passwort)
+            
+            Wichtig: Speichern mit Strg+O, Enter. Beenden mit Strg+X.
+            Dann den Dienst neu starten:
+            
+            Bash
+            sudo systemctl restart ssh
+            4. Der "Check" (Sicherheitstest)
+            Bevor du die aktuelle Root-Verbindung schließt, teste in einem neuen Terminal-Fenster:
+            
+            Komme ich als jbadmin ohne Passwort (nur mit Key) rein?
+            
+            Kann jbadmin mit sudo -i zu Root werden?
+            
+            Kann joergboris Docker-Befehle nutzen (docker ps)?
+            
+            Hat jbwork keinen Zugriff auf Docker und Sudo?
+            
+            Deine neue Struktur im Überblick:
+            User	Passwort-Login	SSH-Key Login	Sudo (Admin)	Docker Zugriff
+            root	❌ Nein	✅ Ja	-	✅ Ja
+            jbadmin	❌ Nein	✅ Ja	✅ Ja	✅ Ja
+            joergboris	❌ Nein	✅ Ja	✅ Ja	✅ Ja
+            jbwork	❌ Nein	✅ Ja	❌ Nein	❌ Nein
+
+#SSH absichern
+sudo nano /etc/ssh/sshd_config
+
+#Fail2Ban
+  sudo apt update && sudo apt install fail2ban -y
+  # Kopie der Konfiguration erstellen
+  sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+  sudo nano /etc/fail2ban/jail.local
+
+Suche den Abschnitt [sshd] (oder füge ihn unten hinzu) und stelle sicher, dass er so aussieht:
+
+Ini, TOML
+[sshd]
+enabled = true
+port    = ssh
+filter  = sshd
+logpath = %(sshd_log)s
+maxretry = 3
+findtime = 10m
+bantime  = 1h
+Was bedeuten diese Werte?
+
+maxretry = 3: Nach 3 Fehlversuchen ist Schicht im Schacht.
+
+findtime = 10m: Die Versuche müssen innerhalb von 10 Minuten passieren.
+
+bantime = 1h: Die IP wird für eine Stunde komplett gesperrt.
+  sudo fail2ban-client status sshd
+Logbuch lesen
+  sudo tail -f /var/log/fail2ban.log
+
+# Ordner erstellen
+sudo mkdir -p /srv/docker
+
+# Rechte so setzen, dass die Gruppe 'docker' (deine Admins) schreiben darf
+sudo chown root:docker /srv/docker
+sudo chmod 775 /srv/docker
